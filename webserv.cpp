@@ -45,7 +45,7 @@ int main() {
     int opt = 1;
     int ret_bind = setsockopt(fdSocket, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
     if (fdSocket == -1) {
-        perror ("socket:");
+        perror ("setsockopt");
         return (1);
     }
     int             max_socket = fdSocket;
@@ -84,7 +84,7 @@ int main() {
             server[fdClint].request_finish = 0;
             server[fdClint].response_finish = 0;
 
-            int max = (*(--server.end())).first;
+            int max = (--server.end())->first;
             max_socket = std::max(max, max_socket);
             FD_SET(fdClint, &readSet);
             answer--;
@@ -99,7 +99,7 @@ int main() {
                 int size = read(it->first, buf, 1024);
                 if (size < 0)
                 {
-                    perror("read;");
+                    perror("read");
                     answer--;
                     continue;
                 }
@@ -133,7 +133,7 @@ int main() {
                 {
                     std::cout << "error " << std::endl;
                 }
-                std::cout << "|" << ClintObj.response << "|" << std::endl; 
+                std::cout << "\n|" << ClintObj.response << "|" << std::endl; 
                 FD_CLR(it->first, &writeSet);
                 FD_SET(it->first, &readSet);
                 answer--;
