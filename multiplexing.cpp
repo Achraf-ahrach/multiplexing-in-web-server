@@ -35,7 +35,7 @@ void    acceptClient(int fdSocket, std::map<int, Client> &server, fd_set &readSe
     FD_SET(fdClient, &readSet);
 }
 
-int request(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_set &readSet, fd_set &writeSet)
+void    request(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_set &readSet, fd_set &writeSet)
 {
     char buf[1024];
 
@@ -46,7 +46,6 @@ int request(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_set
         FD_CLR(it->first, &readSet);
         close(it->first);
         clear.push_back(it->first);
-        return 0;
     }
     it->second.buf.append(buf, read_len);
     if (it->second.buf.find("\r\n\r\n")) {
@@ -55,25 +54,31 @@ int request(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_set
         FD_SET(it->first, &writeSet);
         it->second.buf = "";
     }
-    return 1;
 }
 
 void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_set &readSet, fd_set &writeSet)
 {
-    if (it->second.isFinishReadInputFile) {
+    if (it->second.isFinishReadInputFile)
+    {
         int HowIwillsend = 1024;
         if (it->second.response.size() < 1024)
             HowIwillsend = it->second.response.size();
+        
         int sizeRead = send(it->first, it->second.response.c_str(), HowIwillsend, MSG_NOSIGNAL);
-        if (sizeRead == -1) {
+        
+        if (sizeRead == -1)
+        {
             perror("send");
             FD_CLR(it->first, &writeSet);
             close(it->first);
             clear.push_back(it->first);
         }
-        else {
+        else
+        {
             it->second.response.erase(0, sizeRead);
-            if (it->second.response.empty()) {
+            
+            if (it->second.response.empty())
+            {
                 it->second.isFinishReadInputFile = 0;
                 FD_CLR(it->first, &writeSet);
                 FD_SET(it->first, &readSet);
@@ -81,9 +86,11 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
             }
         }
     }
-    else if (!it->second.inputFile.is_open()) {
+    else if (!it->second.inputFile.is_open())
+    {
         it->second.inputFile.open("video.mp4", std::ios::binary);
-        if (!it->second.inputFile.is_open()) {
+        if (!it->second.inputFile.is_open())
+        {
             std::cerr << "open inputFile\n";
             FD_CLR(it->first, &writeSet);
             close(it->first);
@@ -101,7 +108,7 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
             it->second.response += "Connection: Keep-Alive\n\r";
             it->second.response += "Content-Length: ";
             it->second.response.append(std::to_string(it->second.bufInputFile.size())).append("\r\n\r\n");
-            it->second.response += it->second.bufInputFile;
+            it->second.response += it->second.bufInputFile + "\r\n";
             it->second.isFinishReadInputFile = 1;
         }
     }
@@ -128,54 +135,67 @@ int main ()
     int addr_len = sizeof(addr);
 
     fdSocket = socket(AF_INET, SOCK_STREAM, 0);
-    if (fdSocket == -1) {
+    if (fdSocket == -1)
+    {
         perror("Error fdSocket");
         exit (1);
     }
     int opt = 1;
-    if (setsockopt(fdSocket, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) == -1) {
+    if (setsockopt(fdSocket, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) == -1)
+    {
         perror("setsockopt");
         exit (1);
     }
     server[fdSocket];
-    if (bind(fdSocket, (struct sockaddr *)&addr,addr_len) == -1) {
+    if (bind(fdSocket, (struct sockaddr *)&addr,addr_len) == -1)
+    {
         perror("Error bind");
         exit (0);
     }
-    if (listen(fdSocket, 100) == -1) {
+    if (listen(fdSocket, 100) == -1)
+    {
         perror("Error listen");
         exit (1);
     }
     FD_SET(fdSocket, &readSet);
     max_socket = fdSocket;
-    while (1) {
+    while (1)
+    {
         tmp_readSet = readSet;
         tmp_writeSet = writeSet;
 
-        int max = (--server.end())->first;
+        int max = 0;
+        if (!server.empty())
+            max = (--server.end())->first;
         max_socket = std::max(max, max_socket);
         int nbrSelect = select(max_socket + 1, &tmp_readSet, &tmp_writeSet, 0, 0);
-        if (nbrSelect == -1) {
+        if (nbrSelect == -1)
+        {
             perror("Error select");
             exit (1);
         }
-        if (FD_ISSET(fdSocket, &tmp_readSet)) {
+        if (FD_ISSET(fdSocket, &tmp_readSet))
+        {
             nbrSelect--;
             acceptClient(fdSocket, server, readSet);
         }
-        for(it = server.begin(); it != server.end(); nbrSelect, it++) {
-            if (FD_ISSET(it->first, &tmp_readSet)) {
+        for(it = server.begin(); it != server.end() && nbrSelect; it++)
+        {
+            if (FD_ISSET(it->first, &tmp_readSet))
+            {
                 nbrSelect--;
-                if (!request(it, clear, readSet, writeSet))
-                    continue;
+                request(it, clear, readSet, writeSet);
             }
-            else if (FD_ISSET(it->first, &tmp_writeSet)) {
+            else if (FD_ISSET(it->first, &tmp_writeSet))
+            {
                 nbrSelect--;
                 response(it, clear, readSet, writeSet);
             }
         }
-        for (int i = 0; i < clear.size(); i++) {
+        for (int i = 0; i < clear.size(); i++)
+        {
             server.erase(clear[i]);
         }
+        clear.clear();
     }
 }
