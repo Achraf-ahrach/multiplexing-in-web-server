@@ -15,7 +15,7 @@ class Client {
         std::string     request;
         std::string     response;
         std::ifstream   inputFile;
-        int             isFinishReadresponse;
+        int             isFinishReadInputFile;
         std::string     bufInputFile;
         std::string     buf;
 };
@@ -31,7 +31,7 @@ void    acceptClient(int fdSocket, std::map<int, Client> &server, fd_set &readSe
         exit (1);
     }
     server[fdClient];
-    server[fdClient].isFinishReadresponse = 0;
+    server[fdClient].isFinishReadInputFile = 0;
     FD_SET(fdClient, &readSet);
 }
 
@@ -60,25 +60,27 @@ int request(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_set
 
 void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_set &readSet, fd_set &writeSet)
 {
-    if (it->second.isFinishReadresponse) {
-        int ret = send(it->first, it->second.response.c_str(), 1024, MSG_NOSIGNAL);
-        std::cout << ret << " her\n";
-        if (ret == -1) {
+    if (it->second.isFinishReadInputFile) {
+        int HowIwillsend = 1024;
+        if (it->second.response.size() < 1024)
+            HowIwillsend = it->second.response.size();
+        // std::cout << it->second.response.size() << "\n";
+        int sizeRead = send(it->first, it->second.response.c_str(), HowIwillsend, MSG_NOSIGNAL);
+        if (sizeRead == -1) {
             perror("send");
             FD_CLR(it->first, &writeSet);
             close(it->first);
             clear.push_back(it->first);
         }
-        else if (ret != 1024) {
-            FD_CLR(it->first, &writeSet);
-            FD_SET(it->first, &readSet);
-            it->second.isFinishReadresponse = 0;
-            std::cout << "finish write\n";
-        }
         else {
-            it->second.response.erase(0, 1024);
+            it->second.response.erase(0, sizeRead);
+            if (it->second.response.empty()) {
+                it->second.isFinishReadInputFile = 0;
+                FD_CLR(it->first, &writeSet);
+                FD_SET(it->first, &readSet);
+                std::cout << "finish write\n";
+            }
         }
-        // std::cout << "ret = " << ret << " : response = " <<it->second.response.size() << "\n";
     }
     else if (!it->second.inputFile.is_open()) {
         it->second.inputFile.open("video.mp4", std::ios::binary);
@@ -102,7 +104,7 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
             it->second.response += "Content-Length: ";
             it->second.response.append(std::to_string(it->second.bufInputFile.size())).append("\r\n\r\n");
             it->second.response += it->second.bufInputFile;
-            it->second.isFinishReadresponse = 1;
+            it->second.isFinishReadInputFile = 1;
         }
     }
 }
