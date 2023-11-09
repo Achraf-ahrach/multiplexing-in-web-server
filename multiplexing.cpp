@@ -64,7 +64,6 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
         int HowIwillsend = 1024;
         if (it->second.response.size() < 1024)
             HowIwillsend = it->second.response.size();
-        // std::cout << it->second.response.size() << "\n";
         int sizeRead = send(it->first, it->second.response.c_str(), HowIwillsend, MSG_NOSIGNAL);
         if (sizeRead == -1) {
             perror("send");
@@ -95,7 +94,6 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
         char buf[1024];
         bzero(buf, 1024);
         it->second.inputFile.read(buf, 1024);
-        //std::cout << "gcount = "<< it->second.inputFile.gcount() << "\n";
         it->second.bufInputFile.append(buf, it->second.inputFile.gcount());
         if (it->second.inputFile.gcount() < 1024) {
             it->second.response = "HTTP/1.1 200 OK\n\r";
