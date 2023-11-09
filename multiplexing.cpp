@@ -41,14 +41,17 @@ void    request(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd
 
     bzero(buf, 1024);
     int read_len = recv(it->first, buf, 1024, 0);
-    if (read_len <= 0) {
-        perror("read");
+    if (read_len <= 0)
+    {
+        perror("11read");
         FD_CLR(it->first, &readSet);
         close(it->first);
         clear.push_back(it->first);
+        return ;
     }
     it->second.buf.append(buf, read_len);
-    if (it->second.buf.find("\r\n\r\n")) {
+    if (it->second.buf.find("\r\n\r\n"))
+    {
         std::cout << "read finish\n";
         FD_CLR(it->first, &readSet);
         FD_SET(it->first, &writeSet);
@@ -63,9 +66,7 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
         int HowIwillsend = 1024;
         if (it->second.response.size() < 1024)
             HowIwillsend = it->second.response.size();
-        
         int sizeRead = send(it->first, it->second.response.c_str(), HowIwillsend, MSG_NOSIGNAL);
-        
         if (sizeRead == -1)
         {
             perror("send");
@@ -76,7 +77,6 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
         else
         {
             it->second.response.erase(0, sizeRead);
-            
             if (it->second.response.empty())
             {
                 it->second.isFinishReadInputFile = 0;
@@ -97,12 +97,14 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
             clear.push_back(it->first);
         }
     }
-    else {
+    else
+    {
         char buf[1024];
         bzero(buf, 1024);
         it->second.inputFile.read(buf, 1024);
         it->second.bufInputFile.append(buf, it->second.inputFile.gcount());
-        if (it->second.inputFile.gcount() < 1024) {
+        if (it->second.inputFile.gcount() < 1024)
+        {
             it->second.response = "HTTP/1.1 200 OK\n\r";
             it->second.response += "Content-Type: video/mp4\n\r";
             it->second.response += "Connection: Keep-Alive\n\r";
