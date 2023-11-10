@@ -59,7 +59,6 @@ void    request(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd
 
 void    SendInSocket(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_set &readSet, fd_set &writeSet)
 {
-    here:
     int HowIwillsend = 1024;
     if (it->second.response.size() < 1024)
         HowIwillsend = it->second.response.size();
@@ -73,8 +72,8 @@ void    SendInSocket(std::map<int, Client>::iterator &it, std::vector<int> &clea
     else
     {
         it->second.response.erase(0, sizeRead);
-        if (!it->second.response.empty())
-            goto here;
+        if (it->second.response.empty())
+            it->second.response = "";
     }
 }
 
@@ -100,20 +99,24 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
     }
     else
     {
-        char buf[1024];
-        bzero(buf, 1024);
-        it->second.inputFile.read(buf, 1024);
-        it->second.bufInputFile.append(buf, it->second.inputFile.gcount());
-        it->second.response += it->second.bufInputFile;
-        SendInSocket(it, clear, readSet, writeSet);
-        it->second.bufInputFile = "";
-        it->second.response = "";
-        if (it->second.inputFile.gcount() < 1024)
+        if (it->second.response.empty())
+            SendInSocket(it, clear, readSet, writeSet);
+        else
         {
-            it->second.inputFile.close();
-            FD_CLR(it->first, &writeSet);
-            FD_SET(it->first, &readSet);
-            std::cout << "finish write\n";
+            char buf[1024];
+            bzero(buf, 1024);
+            it->second.inputFile.read(buf, 1024);
+            it->second.bufInputFile.append(buf, it->second.inputFile.gcount());
+            it->second.response += it->second.bufInputFile;
+            SendInSocket(it, clear, readSet, writeSet);
+            it->second.bufInputFile = "";
+            if (it->second.inputFile.gcount() < 1024)
+            {
+                it->second.inputFile.close();
+                FD_CLR(it->first, &writeSet);
+                FD_SET(it->first, &readSet);
+                std::cout << "finish write\n";
+            }
         }
     }
 }
