@@ -15,7 +15,6 @@ class Client {
         std::string     request;
         std::string     response;
         std::ifstream   inputFile;
-        int             isFinishReadInputFile;
         std::string     bufInputFile;
         std::string     buf;
 };
@@ -32,7 +31,6 @@ void    acceptClient(int fdSocket, std::map<int, Client> &server, fd_set &readSe
     }
     std::cout << "accept client [" << fdClient << "]\n";
     server[fdClient];
-    server[fdClient].isFinishReadInputFile = 0;
     FD_SET(fdClient, &readSet);
 }
 
@@ -59,34 +57,30 @@ void    request(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd
     }
 }
 
+void    SendInSocket(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_set &readSet, fd_set &writeSet)
+{
+    here:
+    int HowIwillsend = 1024;
+    if (it->second.response.size() < 1024)
+        HowIwillsend = it->second.response.size();
+    int sizeRead = send(it->first, it->second.response.c_str(), HowIwillsend, MSG_NOSIGNAL);
+    if (sizeRead == -1)
+    {
+        perror("send");
+        FD_CLR(it->first, &writeSet);
+        clear.push_back(it->first);
+    }
+    else
+    {
+        it->second.response.erase(0, sizeRead);
+        if (!it->second.response.empty())
+            goto here;
+    }
+}
+
 void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_set &readSet, fd_set &writeSet)
 {
-    if (it->second.isFinishReadInputFile)
-    {
-        int HowIwillsend = 1024;
-        if (it->second.response.size() < 1024)
-            HowIwillsend = it->second.response.size();
-        int sizeRead = send(it->first, it->second.response.c_str(), HowIwillsend, MSG_NOSIGNAL);
-        if (sizeRead == -1)
-        {
-            perror("send");
-            FD_CLR(it->first, &writeSet);
-            clear.push_back(it->first);
-        }
-        else
-        {
-            it->second.response.erase(0, sizeRead);
-            if (it->second.response.empty())
-            {
-                it->second.isFinishReadInputFile = 0;
-                FD_CLR(it->first, &writeSet);
-                FD_SET(it->first, &readSet);
-                std::cout << "finish write\n";
-                it->second.response = "";
-            }
-        }
-    }
-    else if (!it->second.inputFile.is_open())
+    if (!it->second.inputFile.is_open())
     {
         it->second.inputFile.open("video.mp4", std::ios::binary);
         if (!it->second.inputFile.is_open())
@@ -95,6 +89,14 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
             FD_CLR(it->first, &writeSet);
             clear.push_back(it->first);
         }
+        it->second.response = "HTTP/1.1 200 OK\n\r";
+        it->second.response += "Content-Type: video/mp4\n\r";
+        it->second.response += "Connection: Keep-Alive\n\r";
+        it->second.response += "Content-Length: ";
+        it->second.inputFile.seekg(0, it->second.inputFile.end);
+        int length = it->second.inputFile.tellg();
+        it->second.inputFile.seekg(0, it->second.inputFile.beg);
+        it->second.response.append(std::to_string(length)).append("\r\n\r\n");
     }
     else
     {
@@ -102,17 +104,16 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
         bzero(buf, 1024);
         it->second.inputFile.read(buf, 1024);
         it->second.bufInputFile.append(buf, it->second.inputFile.gcount());
+        it->second.response += it->second.bufInputFile;
+        SendInSocket(it, clear, readSet, writeSet);
+        it->second.bufInputFile = "";
+        it->second.response = "";
         if (it->second.inputFile.gcount() < 1024)
         {
-            it->second.response = "HTTP/1.1 200 OK\n\r";
-            it->second.response += "Content-Type: video/mp4\n\r";
-            it->second.response += "Connection: Keep-Alive\n\r";
-            it->second.response += "Content-Length: ";
-            it->second.response.append(std::to_string(it->second.bufInputFile.size())).append("\r\n\r\n");
-            it->second.response += it->second.bufInputFile + "\r\n";
-            it->second.isFinishReadInputFile = 1;
-            it->second.bufInputFile = "";
             it->second.inputFile.close();
+            FD_CLR(it->first, &writeSet);
+            FD_SET(it->first, &readSet);
+            std::cout << "finish write\n";
         }
     }
 }
