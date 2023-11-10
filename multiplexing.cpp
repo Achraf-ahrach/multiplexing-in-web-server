@@ -30,6 +30,7 @@ void    acceptClient(int fdSocket, std::map<int, Client> &server, fd_set &readSe
         perror("accept");
         exit (1);
     }
+    std::cout << "accept client [" << fdClient << "]\n";
     server[fdClient];
     server[fdClient].isFinishReadInputFile = 0;
     FD_SET(fdClient, &readSet);
@@ -43,9 +44,9 @@ void    request(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd
     int read_len = recv(it->first, buf, 1024, 0);
     if (read_len <= 0)
     {
-        perror("11read");
+        perror("read");
         FD_CLR(it->first, &readSet);
-        close(it->first);
+        //close(it->first);
         clear.push_back(it->first);
         return ;
     }
@@ -71,7 +72,7 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
         {
             perror("send");
             FD_CLR(it->first, &writeSet);
-            close(it->first);
+            //close(it->first);
             clear.push_back(it->first);
         }
         else
@@ -83,6 +84,7 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
                 FD_CLR(it->first, &writeSet);
                 FD_SET(it->first, &readSet);
                 std::cout << "finish write\n";
+                it->second.response = "";
             }
         }
     }
@@ -93,7 +95,7 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
         {
             std::cerr << "open inputFile\n";
             FD_CLR(it->first, &writeSet);
-            close(it->first);
+            //close(it->first);
             clear.push_back(it->first);
         }
     }
@@ -112,6 +114,7 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
             it->second.response.append(std::to_string(it->second.bufInputFile.size())).append("\r\n\r\n");
             it->second.response += it->second.bufInputFile + "\r\n";
             it->second.isFinishReadInputFile = 1;
+            it->second.bufInputFile = "";
         }
     }
 }
@@ -166,10 +169,10 @@ int main ()
         tmp_readSet = readSet;
         tmp_writeSet = writeSet;
 
-        int max = 0;
+        int max_socket = fdSocket;
         if (!server.empty())
-            max = (--server.end())->first;
-        max_socket = std::max(max, max_socket);
+            max_socket = (--server.end())->first;
+
         int nbrSelect = select(max_socket + 1, &tmp_readSet, &tmp_writeSet, 0, 0);
         if (nbrSelect == -1)
         {
@@ -181,7 +184,7 @@ int main ()
             nbrSelect--;
             acceptClient(fdSocket, server, readSet);
         }
-        for(it = server.begin(); it != server.end() && nbrSelect; it++)
+        for(it = server.begin(); it != server.end() && nbrSelect > 0; it++)
         {
             if (FD_ISSET(it->first, &tmp_readSet))
             {
@@ -196,7 +199,9 @@ int main ()
         }
         for (int i = 0; i < clear.size(); i++)
         {
+            std::cout << "close client [" << clear[i] << "]\n";
             server.erase(clear[i]);
+            close(clear[i]);
         }
         clear.clear();
     }
