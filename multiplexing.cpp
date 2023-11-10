@@ -46,7 +46,6 @@ void    request(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd
     {
         perror("read");
         FD_CLR(it->first, &readSet);
-        //close(it->first);
         clear.push_back(it->first);
         return ;
     }
@@ -72,7 +71,6 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
         {
             perror("send");
             FD_CLR(it->first, &writeSet);
-            //close(it->first);
             clear.push_back(it->first);
         }
         else
@@ -95,7 +93,6 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
         {
             std::cerr << "open inputFile\n";
             FD_CLR(it->first, &writeSet);
-            //close(it->first);
             clear.push_back(it->first);
         }
     }
@@ -115,6 +112,7 @@ void response(std::map<int, Client>::iterator &it, std::vector<int> &clear, fd_s
             it->second.response += it->second.bufInputFile + "\r\n";
             it->second.isFinishReadInputFile = 1;
             it->second.bufInputFile = "";
+            it->second.inputFile.close();
         }
     }
 }
@@ -151,7 +149,7 @@ int main ()
         perror("setsockopt");
         exit (1);
     }
-    server[fdSocket];
+
     if (bind(fdSocket, (struct sockaddr *)&addr,addr_len) == -1)
     {
         perror("Error bind");
@@ -162,8 +160,11 @@ int main ()
         perror("Error listen");
         exit (1);
     }
+
+    FD_ZERO(&readSet);
+    FD_ZERO(&writeSet);
+
     FD_SET(fdSocket, &readSet);
-    max_socket = fdSocket;
     while (1)
     {
         tmp_readSet = readSet;
